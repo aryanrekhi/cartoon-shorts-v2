@@ -1,0 +1,55 @@
+# TOPICS — One per line. Autopilot picks today's by date rotation.
+#
+# KEY RULE: Be SPECIFIC. Not "unsolved mysteries" but
+# "The Hinterkaifeck murders — six people killed on a German farm in 1922, and the killer lived in their house for days."
+#
+# Each topic should contain enough detail for the AI to write a compelling, specific story.
+
+# ── True Crime / Cold Cases ──
+The Hinterkaifeck murders — six people killed on a German farm in 1922, and the killer lived with the bodies for days afterward
+The Tamam Shud case — an unidentified man found dead on an Australian beach in 1948 with a coded message in his pocket
+The disappearance of the Beaumont children from Glenelg Beach, Adelaide, in 1966 — Australia's most famous cold case
+The Cleveland Torso Murderer who killed at least twelve people in the 1930s while Eliot Ness hunted them and never caught them
+The Zodiac Killer's 340 cipher that took amateur codebreakers fifty-one years to finally solve in 2020
+
+# ── Historical Mysteries ──
+The Dyatlov Pass incident — nine experienced hikers found dead in the Ural Mountains in 1959 with injuries that still defy explanation
+The lost colony of Roanoke — one hundred fifteen English settlers vanished from their settlement in 1590 leaving only the word CROATOAN carved into a post
+The Mary Celeste — a ship found drifting in the Atlantic in 1872 with hot food on the table but every crew member gone
+The Voynich Manuscript — a six hundred year old book written in an unknown language and alphabet that no one has ever decoded
+Lead masks of Vintem Hill — two electronic technicians found dead on a hilltop in Brazil wearing homemade lead eye masks in 1966
+
+# ── Science and Nature ──
+The Bloop — an ultra-low frequency underwater sound detected by NOAA in 1997 that was louder than any known animal
+Ball lightning — the bizarre atmospheric phenomenon that even physicists cannot fully explain, reported for centuries but only recently captured on film
+The Tunguska event of 1908 — an explosion over Siberia that flattened eighty million trees across eight hundred square miles with no impact crater
+Rogue waves — freak ocean waves up to thirty meters tall that scientists denied existed until satellites proved them real in 1995
+The Wow signal — a seventy-two second radio signal from deep space detected in 1977 that has never been explained or repeated
+
+# ── Bizarre Historical Events ──
+The Dancing Plague of 1518 — when four hundred people in Strasbourg danced for days without rest until some of them died
+The Great Molasses Flood of 1919 — a wave of two million gallons of molasses burst from a tank in Boston killing twenty one people
+The London Beer Flood of 1814 — when a giant vat of beer exploded and sent a tidal wave through the streets killing eight people
+The Kentucky Meat Shower of 1876 — chunks of meat fell from a clear sky over Bath County for several minutes and no one knows why
+Spring Heeled Jack — the mysterious figure who terrorized Victorian England for decades with glowing eyes and the ability to leap over buildings
+
+# ── Psychology and Human Behavior ──
+The Stanford Prison Experiment and how it actually happened versus what Philip Zimbardo claims — the lies behind the famous study
+The Milgram obedience experiments — how sixty-five percent of ordinary people delivered what they believed were lethal electric shocks because an authority told them to
+Capgras delusion — the terrifying condition where you become convinced your loved ones have been replaced by identical imposters
+The Cotard delusion — people who genuinely believe they are dead, do not exist, or are missing their organs
+Fatal familial insomnia — the rare genetic disease where you stop sleeping entirely and die within months, and nothing can help
+
+# ── Technology and Engineering ──
+The Antikythera mechanism — a two thousand year old analog computer found in a Greek shipwreck that could predict eclipses
+The Baghdad Battery — clay jars from ancient Iraq that may have been used to generate electricity two thousand years ago
+Starlite — the material invented by a hairdresser that could withstand nuclear-bomb-level heat, whose formula died with him
+The Soviet Duga radar — a massive over the horizon radar system that could be heard worldwide as a mysterious tapping sound during the Cold War
+Project Azorian — the CIAs secret mission to raise a sunken Soviet nuclear submarine from three miles beneath the Pacific Ocean
+
+# ── Space ──
+The WOW signal and the mystery of whether it was an alien transmission or a comet's hydrogen cloud
+Tabby's Star — the star whose light dims by twenty-two percent at random intervals and no natural explanation fully accounts for it
+The Great Silence — the Fermi Paradox and why in a universe with billions of planets we have detected zero signs of intelligent life
+The Black Knight Satellite — the alleged thirteen thousand year old alien satellite in Earths orbit and the real story behind the photographs
+Fast Radio Bursts — mysterious millisecond blasts of radio energy from billions of light years away that repeat in unexplained patterns
