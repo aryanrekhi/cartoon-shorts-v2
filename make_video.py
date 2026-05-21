@@ -191,9 +191,102 @@ def _try_gemini_image(full_prompt: str, output_path: Path, width: int, height: i
     return False
 
 
+def _try_cloudflare_image(full_prompt: str, output_path: Path, width: int, height: int) -> bool:
+    """Generate image using Cloudflare Workers AI (10K free neurons/day, FLUX models)."""
+    import base64
+
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+    if not account_id or not api_token:
+        return False
+
+    models = [
+        "@cf/black-forest-labs/flux-1-schnell",
+    ]
+
+    for model in models:
+        try:
+            url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
+            r = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {api_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"prompt": full_prompt[:2048], "steps": 8},
+                timeout=120,
+            )
+            if r.status_code != 200:
+                print(f"      Cloudflare/{model.split('/')[-1]} HTTP {r.status_code}")
+                continue
+
+            resp = r.json()
+            b64 = resp.get("result", {}).get("image", "")
+            if b64 and len(b64) > 1000:
+                img_bytes = base64.b64decode(b64)
+                from io import BytesIO
+                img = Image.open(BytesIO(img_bytes)).convert("RGB")
+                img = img.resize((width, height), Image.LANCZOS)
+                img.save(str(output_path), "JPEG", quality=92)
+                print(f"      ✓ Cloudflare/{model.split('/')[-1]}")
+                return True
+
+            print(f"      Cloudflare: no image in response")
+        except Exception as e:
+            print(f"      Cloudflare: {type(e).__name__}: {e}")
+
+    return False
+
+
+def _try_together_image(full_prompt: str, output_path: Path, width: int, height: int) -> bool:
+    """Generate image using Together.ai ($25 free credit, FLUX schnell free endpoint)."""
+    import base64
+
+    api_key = os.environ.get("TOGETHER_API_KEY", "").strip()
+    if not api_key:
+        return False
+
+    try:
+        r = requests.post(
+            "https://api.together.xyz/v1/images/generations",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "black-forest-labs/FLUX.1-schnell-Free",
+                "prompt": full_prompt[:2048],
+                "width": min(width, 1024),
+                "height": min(height, 1024),
+                "steps": 4,
+                "n": 1,
+                "response_format": "b64_json",
+            },
+            timeout=120,
+        )
+        if r.status_code != 200:
+            print(f"      Together HTTP {r.status_code}")
+            return False
+
+        resp = r.json()
+        b64 = resp.get("data", [{}])[0].get("b64_json", "")
+        if b64 and len(b64) > 1000:
+            img_bytes = base64.b64decode(b64)
+            from io import BytesIO
+            img = Image.open(BytesIO(img_bytes)).convert("RGB")
+            img = img.resize((width, height), Image.LANCZOS)
+            img.save(str(output_path), "JPEG", quality=92)
+            print(f"      ✓ Together/FLUX-schnell")
+            return True
+    except Exception as e:
+        print(f"      Together: {type(e).__name__}: {e}")
+
+    return False
+
+
 def _try_pollinations_image(full_prompt: str, output_path: Path,
                             width: int, height: int, seed: int) -> bool:
-    """Fallback: Pollinations (unlimited, decent quality)."""
+    """Last resort fallback: Pollinations (unlimited, decent quality)."""
     models = ["flux", "flux-realism"]
     for model in models:
         for attempt in range(2):
@@ -218,9 +311,11 @@ def generate_image(visual_prompt: str, mood: str, style: str,
                    output_path: Path, width: int, height: int,
                    seed: int = None) -> bool:
     """
-    Generate image with provider cascade:
-      1. Gemini (free 500/day, best quality)
-      2. Pollinations (free unlimited, good fallback)
+    Generate image with provider cascade (all free):
+      1. Gemini        — best quality, 500 free/day
+      2. Cloudflare    — FLUX.1, 10K free neurons/day
+      3. Together.ai   — FLUX schnell, $25 free credit
+      4. Pollinations  — unlimited fallback
     """
     style_suffix = VISUAL_STYLES.get(style, VISUAL_STYLES["cinematic"])
     mood_mod = MOOD_MODIFIERS.get(mood, MOOD_MODIFIERS["mysterious"])
@@ -229,12 +324,22 @@ def generate_image(visual_prompt: str, mood: str, style: str,
     if seed is None:
         seed = int(hashlib.md5(visual_prompt.encode()).hexdigest()[:8], 16) % 1_000_000
 
-    # Try Gemini first (much better quality, 500 free images/day)
+    # 1. Gemini (best quality)
     if _try_gemini_image(full_prompt, output_path, width, height):
         return True
 
-    # Fallback to Pollinations (unlimited)
-    print("      Gemini unavailable, trying Pollinations...")
+    # 2. Cloudflare Workers AI (FLUX, very good)
+    print("      Trying Cloudflare...")
+    if _try_cloudflare_image(full_prompt, output_path, width, height):
+        return True
+
+    # 3. Together.ai (FLUX schnell, good)
+    print("      Trying Together...")
+    if _try_together_image(full_prompt, output_path, width, height):
+        return True
+
+    # 4. Pollinations (unlimited fallback)
+    print("      Trying Pollinations...")
     if _try_pollinations_image(full_prompt, output_path, width, height, seed):
         return True
 
