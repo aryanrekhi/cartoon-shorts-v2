@@ -1,0 +1,105 @@
+name: Daily Video Factory
+
+on:
+  schedule:
+    # 21:30 UTC = 3:00 AM IST. Change to your timezone at https://crontab.guru
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'Number of videos to build'
+        default: '5'
+        type: string
+      upload:
+        description: 'Upload to YouTube after building?'
+        default: false
+        type: boolean
+      topic:
+        description: 'Override topic (leave empty for auto)'
+        default: ''
+        type: string
+      style:
+        description: 'Visual style (cinematic/anime/noir/comic/realistic/fantasy/retro)'
+        default: ''
+        type: string
+      long_form:
+        description: 'Build one long-form video instead?'
+        default: false
+        type: boolean
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300  # 5 hours max
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
+      - name: Install Python deps
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore YouTube credentials
+        if: ${{ github.event.inputs.upload == 'true' || github.event_name == 'schedule' }}
+        run: |
+          if [ -n "${{ secrets.YOUTUBE_CLIENT_SECRET }}" ]; then
+            echo '${{ secrets.YOUTUBE_CLIENT_SECRET }}' > client_secret.json
+          fi
+          if [ -n "${{ secrets.YOUTUBE_TOKEN }}" ]; then
+            echo '${{ secrets.YOUTUBE_TOKEN }}' > token.json
+          fi
+
+      - name: Run autopilot
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: |
+          ARGS="--count ${{ github.event.inputs.count || '5' }}"
+
+          if [ -n "${{ github.event.inputs.topic }}" ]; then
+            ARGS="$ARGS --topic '${{ github.event.inputs.topic }}'"
+          fi
+
+          if [ -n "${{ github.event.inputs.style }}" ]; then
+            ARGS="$ARGS --style ${{ github.event.inputs.style }}"
+          fi
+
+          if [ "${{ github.event.inputs.long_form }}" == "true" ]; then
+            ARGS="$ARGS --long"
+          fi
+
+          # Upload on schedule runs, or when manually enabled
+          if [ "${{ github.event.inputs.upload }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            ARGS="$ARGS --upload"
+          fi
+
+          eval python autopilot.py $ARGS
+
+      - name: Save log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopilot-log-${{ github.run_number }}
+          path: autopilot.log
+          retention-days: 14
+
+      - name: Save videos (if not uploaded)
+        if: ${{ github.event.inputs.upload != 'true' && github.event_name != 'schedule' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos-${{ github.run_number }}
+          path: output/*.mp4
+          retention-days: 7
