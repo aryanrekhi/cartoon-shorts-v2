@@ -27,8 +27,6 @@ import edge_tts
 import numpy as np
 import requests
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
-if not hasattr(Image, "ANTIALIAS"): Image.ANTIALIAS = Image.LANCZOS
-  
 from moviepy.editor import (
     AudioFileClip, CompositeVideoClip, ImageClip, VideoClip,
     concatenate_audioclips, afx,
@@ -123,8 +121,9 @@ POLLINATIONS_URL = (
 
 # Gemini image models to try (newest first)
 GEMINI_IMAGE_MODELS = [
-    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-preview-image-generation",
     "gemini-2.5-flash-preview-image-generation",
+    "gemini-2.0-flash-exp-image-generation",
 ]
 
 ASPECT_RATIOS = {
