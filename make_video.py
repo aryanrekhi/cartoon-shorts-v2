@@ -27,6 +27,8 @@ import edge_tts
 import numpy as np
 import requests
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+if not hasattr(Image, "ANTIALIAS"): Image.ANTIALIAS = Image.LANCZOS
+
 from moviepy.editor import (
     AudioFileClip, CompositeVideoClip, ImageClip, VideoClip,
     concatenate_audioclips, afx,
