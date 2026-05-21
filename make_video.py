@@ -112,32 +112,90 @@ NEGATIVE_PROMPT = (
     "low resolution, pixelated, oversaturated, cartoon unless specified"
 )
 
-# ── Image generation ──
+# ── Image generation (multi-provider: Gemini → Pollinations) ──
 
 POLLINATIONS_URL = (
     "https://image.pollinations.ai/prompt/{prompt}"
     "?model={model}&width={w}&height={h}&nologo=true&enhance=true&seed={seed}"
 )
 
-IMAGE_MODELS = ["flux", "flux-realism", "flux"]  # Try flux-realism for variety
+# Gemini image models to try (newest first)
+GEMINI_IMAGE_MODELS = [
+    "gemini-2.0-flash-exp",
+    "gemini-2.5-flash-preview-image-generation",
+]
 
-def generate_image(visual_prompt: str, mood: str, style: str,
-                   output_path: Path, width: int, height: int,
-                   seed: int = None) -> bool:
-    """Generate a single high-quality image with mood-aware prompting."""
-    style_suffix = VISUAL_STYLES.get(style, VISUAL_STYLES["cinematic"])
-    mood_mod = MOOD_MODIFIERS.get(mood, MOOD_MODIFIERS["mysterious"])
-    
-    full_prompt = f"{visual_prompt}. {mood_mod}. Style: {style_suffix}"
-    
-    if seed is None:
-        seed = int(hashlib.md5(visual_prompt.encode()).hexdigest()[:8], 16) % 1_000_000
-    
-    # Try multiple models for best result
-    best_data = None
-    best_size = 0
-    
-    for model in IMAGE_MODELS:
+ASPECT_RATIOS = {
+    (1080, 1920): "9:16",   # vertical short
+    (1920, 1080): "16:9",   # horizontal long
+    (1080, 1080): "1:1",    # square
+}
+
+
+def _try_gemini_image(full_prompt: str, output_path: Path, width: int, height: int) -> bool:
+    """Generate image using Gemini API (500 free/day, much higher quality)."""
+    import json
+    import base64
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return False
+
+    aspect = ASPECT_RATIOS.get((width, height), "9:16")
+
+    for model in GEMINI_IMAGE_MODELS:
+        try:
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/"
+                f"models/{model}:generateContent?key={api_key}"
+            )
+            payload = {
+                "contents": [{"parts": [{"text": full_prompt}]}],
+                "generationConfig": {
+                    "responseModalities": ["IMAGE", "TEXT"],
+                },
+            }
+            data = json.dumps(payload).encode("utf-8")
+            req = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                data=data,
+                timeout=90,
+            )
+
+            if req.status_code != 200:
+                print(f"      Gemini/{model} HTTP {req.status_code}")
+                continue
+
+            resp = req.json()
+
+            # Extract base64 image from response
+            for candidate in resp.get("candidates", []):
+                for part in candidate.get("content", {}).get("parts", []):
+                    inline = part.get("inlineData", {})
+                    b64 = inline.get("data", "")
+                    if b64 and len(b64) > 1000:
+                        img_bytes = base64.b64decode(b64)
+                        # Gemini returns PNG — convert and resize to exact dimensions
+                        from io import BytesIO
+                        img = Image.open(BytesIO(img_bytes)).convert("RGB")
+                        img = img.resize((width, height), Image.LANCZOS)
+                        img.save(str(output_path), "JPEG", quality=92)
+                        print(f"      ✓ Gemini/{model}")
+                        return True
+
+            print(f"      Gemini/{model}: no image in response")
+        except Exception as e:
+            print(f"      Gemini/{model}: {type(e).__name__}: {e}")
+
+    return False
+
+
+def _try_pollinations_image(full_prompt: str, output_path: Path,
+                            width: int, height: int, seed: int) -> bool:
+    """Fallback: Pollinations (unlimited, decent quality)."""
+    models = ["flux", "flux-realism"]
+    for model in models:
         for attempt in range(2):
             try:
                 url = POLLINATIONS_URL.format(
@@ -147,17 +205,39 @@ def generate_image(visual_prompt: str, mood: str, style: str,
                 )
                 r = requests.get(url, timeout=150)
                 if r.status_code == 200 and len(r.content) > 40000:
-                    if len(r.content) > best_size:
-                        best_data = r.content
-                        best_size = len(r.content)
-                    break  # Got a good image from this model
-            except Exception as e:
+                    with open(output_path, "wb") as f:
+                        f.write(r.content)
+                    print(f"      ✓ Pollinations/{model}")
+                    return True
+            except Exception:
                 time.sleep(2)
-    
-    if best_data:
-        with open(output_path, "wb") as f:
-            f.write(best_data)
+    return False
+
+
+def generate_image(visual_prompt: str, mood: str, style: str,
+                   output_path: Path, width: int, height: int,
+                   seed: int = None) -> bool:
+    """
+    Generate image with provider cascade:
+      1. Gemini (free 500/day, best quality)
+      2. Pollinations (free unlimited, good fallback)
+    """
+    style_suffix = VISUAL_STYLES.get(style, VISUAL_STYLES["cinematic"])
+    mood_mod = MOOD_MODIFIERS.get(mood, MOOD_MODIFIERS["mysterious"])
+    full_prompt = f"{visual_prompt}. {mood_mod}. Style: {style_suffix}"
+
+    if seed is None:
+        seed = int(hashlib.md5(visual_prompt.encode()).hexdigest()[:8], 16) % 1_000_000
+
+    # Try Gemini first (much better quality, 500 free images/day)
+    if _try_gemini_image(full_prompt, output_path, width, height):
         return True
+
+    # Fallback to Pollinations (unlimited)
+    print("      Gemini unavailable, trying Pollinations...")
+    if _try_pollinations_image(full_prompt, output_path, width, height, seed):
+        return True
+
     return False
 
 
