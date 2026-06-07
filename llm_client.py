@@ -1,6 +1,6 @@
 """
 Multi-LLM client with failover.
-Tries: Gemini → Groq → Cerebras → Pollinations (free fallback).
+Tries: Gemini → Groq → Cerebras → Mistral → OpenRouter → Pollinations (free fallback).
 All free. Combined rate limits = high throughput.
 """
 
@@ -17,9 +17,16 @@ log = logging.getLogger(__name__)
 
 # ── Provider configs ──
 
-GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
 GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 CEREBRAS_MODELS = ["llama3.1-8b", "llama-3.3-70b"]
+MISTRAL_MODELS = ["mistral-small-latest", "open-mistral-7b"]
+OPENROUTER_MODELS = [
+    "deepseek/deepseek-chat-v3.1:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen-2.5-72b-instruct:free",
+    "google/gemma-3-27b-it:free",
+]
 POLLINATIONS_MODELS = ["openai", "mistral"]
 
 # ── HTTP helpers ──
@@ -118,14 +125,75 @@ def _try_cerebras(prompt, system=None, temperature=0.85, max_tokens=2000):
             continue
     return None
 
+def _try_mistral(prompt, system=None, temperature=0.85, max_tokens=2000):
+    """Mistral AI free tier — 1 BILLION tokens/month. Massive backup capacity."""
+    key = os.environ.get("MISTRAL_API_KEY", "").strip()
+    if not key:
+        return None
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    for model in MISTRAL_MODELS:
+        try:
+            resp = _post_json(
+                "https://api.mistral.ai/v1/chat/completions",
+                {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                timeout=30,
+            )
+            text = resp["choices"][0]["message"]["content"].strip()
+            if text and len(text) > 30:
+                return text
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                continue
+        except Exception:
+            continue
+    return None
+
+def _try_openrouter(prompt, system=None, temperature=0.85, max_tokens=2000):
+    """OpenRouter — gateway to 30+ free models (DeepSeek, Llama, Qwen, Gemma)."""
+    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not key:
+        return None
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    for model in OPENROUTER_MODELS:
+        try:
+            resp = _post_json(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/aryanrekhi/cartoon-shorts-v2",
+                    "X-Title": "cartoon-shorts-v2",
+                },
+                timeout=30,
+            )
+            text = resp["choices"][0]["message"]["content"].strip()
+            if text and len(text) > 30:
+                return text
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                continue
+        except Exception:
+            continue
+    return None
+
 def _try_pollinations(prompt, system=None, temperature=0.85, max_tokens=2000):
     full = f"{system}\n\n{prompt}" if system else prompt
     encoded = urllib.parse.quote(full[:3000])
+    poll_key = os.environ.get("POLLINATIONS_KEY", "").strip()
+    key_suffix = f"&key={poll_key}" if poll_key else ""
     for model in POLLINATIONS_MODELS:
         for attempt in range(2):
             try:
                 text = _get_text(
-                    f"https://text.pollinations.ai/{encoded}?model={model}", timeout=60
+                    f"https://text.pollinations.ai/{encoded}?model={model}{key_suffix}", timeout=60
                 ).strip()
                 if text and len(text) > 50:
                     return text
@@ -139,6 +207,8 @@ PROVIDERS = [
     ("gemini", _try_gemini),
     ("groq", _try_groq),
     ("cerebras", _try_cerebras),
+    ("mistral", _try_mistral),
+    ("openrouter", _try_openrouter),
     ("pollinations", _try_pollinations),
 ]
 
