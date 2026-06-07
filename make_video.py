@@ -360,14 +360,21 @@ async def generate_tts(text: str, output_path: Path, voice: str, rate: str = "+5
 # ── Captions (Whisper) ──
 
 def transcribe_audio(audio_path: Path, model_size: str = "base") -> list:
-    import whisper
-    model = whisper.load_model(model_size)
-    result = model.transcribe(str(audio_path), word_timestamps=True, verbose=False)
-    words = []
-    for seg in result["segments"]:
-        for w in seg.get("words", []):
-            words.append({"word": w["word"].strip(), "start": w["start"], "end": w["end"]})
-    return words
+    # V3: prefer faster-whisper (4-8x faster, same accuracy). Falls back to
+    # openai-whisper if faster-whisper isn't installed — see transcribe_v3.py
+    try:
+        from transcribe_v3 import transcribe
+        return transcribe(audio_path, model_size=model_size)
+    except ImportError:
+        # Fallback if transcribe_v3.py wasn't added yet — original V2 behaviour
+        import whisper
+        model = whisper.load_model(model_size)
+        result = model.transcribe(str(audio_path), word_timestamps=True, verbose=False)
+        words = []
+        for seg in result["segments"]:
+            for w in seg.get("words", []):
+                words.append({"word": w["word"].strip(), "start": w["start"], "end": w["end"]})
+        return words
 
 
 def group_words(words: list, per_group: int = 2) -> list:
